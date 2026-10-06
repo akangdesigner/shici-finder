@@ -20,6 +20,8 @@
     --seal: #b0322a;
     --seal-soft: #f3dcd6;
     --chip: #efe6d5;
+    --good: #3d7a4a;
+    --warn: #a86a12;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -31,11 +33,14 @@
       --seal: #e0645a;
       --seal-soft: #3d2622;
       --chip: #2e2a25;
+      --good: #7cc48a;
+      --warn: #e0a54a;
     }
   }
   :root[data-theme="dark"] {
     --bg: #1b1916; --paper: #24211d; --ink: #ece4d6; --ink-soft: #a89e90;
     --line: #3a352e; --seal: #e0645a; --seal-soft: #3d2622; --chip: #2e2a25;
+    --good: #7cc48a; --warn: #e0a54a;
   }
   * { box-sizing: border-box; }
   body {
@@ -137,6 +142,12 @@
   .ex-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--seal); letter-spacing: 1px; }
   .ex p { margin: 4px 0 0; font-size: 16px; }
   .acts { display: flex; gap: 8px; }
+  .tag-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .badge { font-size: 12px; border-radius: 4px; padding: 0 8px; border: 1px solid; }
+  .badge.good { color: var(--good); border-color: var(--good); }
+  .badge.warn { color: var(--warn); border-color: var(--warn); }
+  .badge.bad { color: #fff; background: var(--seal); border-color: var(--seal); }
+  .badge.neutral { color: var(--ink-soft); border-color: var(--line); }
   a.copy { text-decoration: none; }
   .quote { font-size: clamp(19px, 4.5vw, 23px); font-weight: 600; margin: 12px 0 4px; letter-spacing: 1px; }
   .by { color: var(--ink-soft); font-size: 14px; margin: 0 0 12px; }
@@ -180,7 +191,8 @@
   <section id="results"></section>
 
   <footer>
-    內容由 AI 整理，原文與出處偶有出入，正式引用前請再查證一次。<br>
+    內容由 AI 整理，再拿開源典籍資料庫逐句核對；資料庫沒收錄的作品無法核對，正式引用前請再查證一次。<br>
+    核對資料：<a href="https://github.com/chinese-poetry/chinese-poetry" target="_blank" rel="noopener">chinese-poetry</a>（全唐詩、全宋詞、元曲、詩經、楚辭、四書、古文觀止等）、<a href="https://github.com/pwxcoo/chinese-xinhua" target="_blank" rel="noopener">chinese-xinhua</a>（成語）<br>
     由 <a href="https://aiqkangber.com" target="_blank" rel="noopener">Q kangber</a> 用 n8n＋AI 打造
   </footer>
 </main>
@@ -249,12 +261,17 @@ function render(items) {
     card.className = 'card';
     const by = [it.era, it.author].filter(Boolean).join('·') + (it.source ? `〈${it.source}〉` : '');
     card.innerHTML = `
-      <div class="card-top"><span class="tag"></span><span class="acts"><a class="copy verify" target="_blank" rel="noopener">查證</a><button class="copy" type="button">複製引用</button></span></div>
+      <div class="card-top"><span class="tag-row"><span class="tag"></span></span><span class="acts"><a class="copy verify" target="_blank" rel="noopener">查證</a><button class="copy" type="button">複製引用</button></span></div>
       <p class="quote"></p>
       <p class="by"></p>
       <div class="ex"><div class="ex-head"><span>例句</span><button class="copy ex-copy" type="button">複製例句</button></div><p></p></div>
       <dl><dt>白話</dt><dd class="m"></dd><dt>怎麼用</dt><dd class="u"></dd></dl>`;
     card.querySelector('.tag').textContent = it.type || '詩詞';
+    if (it.check) {
+      const b = document.createElement('span');
+      b.className = 'badge ' + it.check.cls; b.textContent = it.check.label; b.title = it.check.tip;
+      card.querySelector('.tag-row').appendChild(b);
+    }
     card.querySelector('.quote').textContent = it.text;
     card.querySelector('.by').textContent = by;
     card.querySelector('.m').textContent = it.meaning;
@@ -287,8 +304,10 @@ async function search() {
     });
     const data = await res.json().catch(() => ({}));
     if (!data.ok) { setStatus(data.error || '出了點狀況，稍後再試', 'err'); return; }
+    setStatus('核對原文中', 'loading');
+    const items = await withTimeout(verifyAll(data.items), 6000).catch(() => data.items);
     setStatus('');
-    render(data.items);
+    render(items);
     results.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch {
     setStatus('連線失敗，稍後再試', 'err');
@@ -296,6 +315,75 @@ async function search() {
     go.disabled = false;
   }
 }
+
+// ── 原文核對 ──────────────────────────────────────────────
+// 跟 scripts/build-index.mjs 同一套 normalize（繁轉簡＋異體字折疊）與 FNV-1a，改一邊要改另一邊再重建 idx/
+const VARIANTS = '隣邻鄰邻鑪炉爐炉汙污沈沉裏里裡里嘆叹歎叹箇个綫线鬭斗鬥斗嚐尝甞尝牀床牕窗窓窗窻窗峯峰羣群迴回囘回煙烟鴈雁栢柏盃杯柸杯闇暗晻暗衹只祇只秖只秪只粧妆妝妆鏁锁恠怪蹤踪跡迹蹟迹著着於于喫吃凴凭憑凭卻却皁皂溼湿濕湿惟唯脣唇鵰雕彫雕凋雕糢模㬉暖煖暖讎仇讐仇疎疏踈疏遶绕繞绕酧酬醻酬竝并並并簷檐';
+const VMAP = new Map(); for (let i = 0; i < VARIANTS.length; i += 2) VMAP.set(VARIANTS[i], VARIANTS[i + 1]);
+// 資料庫幾乎收全的類型：查不到就很可能是錯的；其他類型查不到只代表沒收錄
+const COVERED = ['唐詩', '宋詞', '元曲', '詩經楚辭'];
+const CHECK = {
+  author: { cls: 'good', label: '✓ 原文與作者已核對', tip: '每一句都在典籍資料庫中找到，作者也相符', rank: 0 },
+  text: { cls: 'good', label: '✓ 原文已核對', tip: '每一句都在典籍資料庫中找到（作者寫法不同或未標）', rank: 0 },
+  idiom: { cls: 'good', label: '✓ 成語辭典有收錄', tip: '在成語辭典中找到這個成語', rank: 0 },
+  partial: { cls: 'warn', label: '△ 部分字句與收錄版本不同', tip: '有些句子找得到、有些找不到，可能是版本差異，也可能記錯了', rank: 1 },
+  unknown: { cls: 'neutral', label: '○ 資料庫未收錄，請自行查證', tip: '這類出處不在核對資料庫裡，無法自動核對', rank: 2 },
+  missing: { cls: 'bad', label: '⚠ 查無此句，可能有誤', tip: '這類作品資料庫收錄完整卻找不到這句，很可能是 AI 記錯或編造', rank: 3 }
+};
+
+let t2sPromise;
+function getT2s() {
+  return t2sPromise ||= new Promise((resolve, reject) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/opencc-js@1.4.2/dist/umd/t2cn.js';
+    sc.onload = () => resolve(OpenCC.Converter({ from: 'tw', to: 'cn' }));
+    sc.onerror = reject;
+    document.head.appendChild(sc);
+  });
+}
+const fnv1a = s => { let h = 0x811c9dc5; for (const ch of s) { const c = ch.codePointAt(0); h ^= c & 0xff; h = Math.imul(h, 0x01000193); h ^= c >>> 8; h = Math.imul(h, 0x01000193); } return h >>> 0; };
+const shardCache = new Map();
+function shard(path) {
+  if (!shardCache.has(path)) shardCache.set(path, fetch('idx/' + path).then(r => r.ok ? r.arrayBuffer() : new ArrayBuffer(0)).then(b => new DataView(b)));
+  return shardCache.get(path);
+}
+// 分片內依雜湊排序，二分搜尋找第一筆，回傳該句所有作者雜湊
+async function lookup(h) {
+  const dv = await shard('s/' + (h >>> 20).toString(16).padStart(3, '0') + '.bin');
+  const n = dv.byteLength / 6;
+  let lo = 0, hi = n;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (dv.getUint32(m * 6, true) < h) lo = m + 1; else hi = m; }
+  const authors = [];
+  for (let i = lo; i < n && dv.getUint32(i * 6, true) === h; i++) authors.push(dv.getUint16(i * 6 + 4, true));
+  return authors;
+}
+async function isIdiom(h) {
+  const dv = await shard('idiom/' + (h >>> 24).toString(16).padStart(2, '0') + '.bin');
+  let lo = 0, hi = dv.byteLength / 4;
+  while (lo < hi) { const m = (lo + hi) >> 1; const v = dv.getUint32(m * 4, true); if (v === h) return true; if (v < h) lo = m + 1; else hi = m; }
+  return false;
+}
+
+async function verifyOne(it, t2s) {
+  const norm = x => [...t2s(String(x || '')).replace(/[^\u3400-\u9fff\uf900-\ufaff]/g, '')].map(c => VMAP.get(c) || c).join('');
+  const whole = norm(it.text);
+  if (whole.length >= 3 && whole.length <= 8 && await isIdiom(fnv1a(whole))) return CHECK.idiom;
+  const clauses = t2s(it.text).split(/[，。？！；：、,.?!;:\s「」『』“”‘’（）()《》〈〉·—…\-\[\]]+/).map(norm).filter(c => c.length >= 3);
+  if (!clauses.length) return CHECK.unknown;
+  const ah = fnv1a(norm(it.author)) & 0xffff;
+  let hit = 0, auth = 0;
+  for (const c of clauses) { const a = await lookup(fnv1a(c)); if (a.length) hit++; if (a.includes(ah)) auth++; }
+  if (hit === clauses.length) return auth === clauses.length && it.author ? CHECK.author : CHECK.text;
+  if (hit) return CHECK.partial;
+  return COVERED.includes(it.type) ? CHECK.missing : CHECK.unknown;
+}
+
+async function verifyAll(items) {
+  const t2s = await getT2s();
+  const checked = await Promise.all(items.map(async it => ({ ...it, check: await verifyOne(it, t2s).catch(() => null) })));
+  return checked.map((it, i) => [it, i]).sort((a, b) => ((a[0].check?.rank ?? 2) - (b[0].check?.rank ?? 2)) || a[1] - b[1]).map(x => x[0]);
+}
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 </script>
 </body>
 </html>
