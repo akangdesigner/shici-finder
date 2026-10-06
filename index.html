@@ -125,6 +125,17 @@
     background: none; border: 1px solid var(--line); color: var(--ink-soft);
     border-radius: 6px; padding: 2px 10px; font: inherit; font-size: 13px; cursor: pointer;
   }
+  .types { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 0; border-top: 1px dashed var(--line); }
+  .types-label { font-size: 13px; color: var(--ink-soft); }
+  .tchip {
+    background: transparent; border: 1px solid var(--line); color: var(--ink-soft);
+    border-radius: 6px; padding: 2px 12px; font: inherit; font-size: 14px; cursor: pointer;
+  }
+  .tchip[aria-pressed="true"] { background: var(--seal); border-color: var(--seal); color: #fff; }
+  .tclear { background: none; border: none; color: var(--ink-soft); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; padding: 0; }
+  .ex { background: var(--seal-soft); border-radius: 8px; padding: 12px 16px; margin: 0 0 12px; }
+  .ex-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--seal); letter-spacing: 1px; }
+  .ex p { margin: 4px 0 0; font-size: 16px; }
   .acts { display: flex; gap: 8px; }
   a.copy { text-decoration: none; }
   .quote { font-size: clamp(19px, 4.5vw, 23px); font-weight: 600; margin: 12px 0 4px; letter-spacing: 1px; }
@@ -152,6 +163,9 @@
   <form id="f">
     <label for="q" style="position:absolute;left:-9999px">描述你的情境</label>
     <textarea id="q" maxlength="300" placeholder="例如：好朋友下個月要出國工作，想在送別卡片上寫一句話"></textarea>
+    <div class="types" id="types" role="group" aria-label="引用類型">
+      <span class="types-label">類型（不選＝不限）</span>
+    </div>
     <div class="row">
       <span class="count"><span id="n">0</span> / 300</span>
       <button class="go" id="go" type="submit">找詩句</button>
@@ -181,8 +195,24 @@ const EXAMPLES = [
   '中秋節一個人在外地過'
 ];
 
+const TYPES = ['成語', '典故', '詩經楚辭', '唐詩', '宋詞', '元曲', '古文', '其他古詩詞', '新詩'];
+
 const $ = id => document.getElementById(id);
 const q = $('q'), go = $('go'), status = $('status'), results = $('results');
+
+TYPES.forEach(t => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'tchip'; b.textContent = t; b.dataset.type = t;
+  b.setAttribute('aria-pressed', 'false');
+  b.onclick = () => { b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); syncClear(); };
+  $('types').appendChild(b);
+});
+const clear = document.createElement('button');
+clear.type = 'button'; clear.className = 'tclear'; clear.textContent = '清除'; clear.hidden = true;
+clear.onclick = () => { document.querySelectorAll('.tchip').forEach(b => b.setAttribute('aria-pressed', 'false')); syncClear(); };
+$('types').appendChild(clear);
+function selectedTypes() { return [...document.querySelectorAll('.tchip[aria-pressed="true"]')].map(b => b.dataset.type); }
+function syncClear() { clear.hidden = selectedTypes().length === 0; }
 
 EXAMPLES.forEach(t => {
   const b = document.createElement('button');
@@ -206,6 +236,12 @@ function citation(it) {
   return `${it.text}${by || src ? ' ——' + by + src : ''}`;
 }
 
+async function copy(btn, text, label) {
+  try { await navigator.clipboard.writeText(text); btn.textContent = '已複製'; }
+  catch { btn.textContent = '複製失敗'; }
+  setTimeout(() => btn.textContent = label, 1500);
+}
+
 function render(items) {
   results.innerHTML = '';
   items.forEach(it => {
@@ -216,19 +252,22 @@ function render(items) {
       <div class="card-top"><span class="tag"></span><span class="acts"><a class="copy verify" target="_blank" rel="noopener">查證</a><button class="copy" type="button">複製引用</button></span></div>
       <p class="quote"></p>
       <p class="by"></p>
+      <div class="ex"><div class="ex-head"><span>例句</span><button class="copy ex-copy" type="button">複製例句</button></div><p></p></div>
       <dl><dt>白話</dt><dd class="m"></dd><dt>怎麼用</dt><dd class="u"></dd></dl>`;
     card.querySelector('.tag').textContent = it.type || '詩詞';
     card.querySelector('.quote').textContent = it.text;
     card.querySelector('.by').textContent = by;
     card.querySelector('.m').textContent = it.meaning;
     card.querySelector('.u').textContent = it.fit;
+    const exBox = card.querySelector('.ex');
+    if (it.example) {
+      exBox.querySelector('p').textContent = it.example;
+      const eb = exBox.querySelector('.ex-copy');
+      eb.onclick = () => copy(eb, it.example, '複製例句');
+    } else exBox.remove();
     card.querySelector('.verify').href = 'https://www.google.com/search?q=' + encodeURIComponent('"' + it.text.replace(/[，。？！；、：]/g, ' ').trim().split(/\s+/)[0] + '" ' + (it.author || ''));
-    const btn = card.querySelector('button.copy');
-    btn.onclick = async () => {
-      try { await navigator.clipboard.writeText(citation(it)); btn.textContent = '已複製'; }
-      catch { btn.textContent = '複製失敗'; }
-      setTimeout(() => btn.textContent = '複製引用', 1500);
-    };
+    const btn = card.querySelector('.acts button.copy');
+    btn.onclick = () => copy(btn, citation(it), '複製引用');
     results.appendChild(card);
   });
 }
@@ -244,7 +283,7 @@ async function search() {
     const res = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: text })
+      body: JSON.stringify({ q: text, types: selectedTypes() })
     });
     const data = await res.json().catch(() => ({}));
     if (!data.ok) { setStatus(data.error || '出了點狀況，稍後再試', 'err'); return; }
