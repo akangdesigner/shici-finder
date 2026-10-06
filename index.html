@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>詩詞找句｜說個情境，找一句古人替你說</title>
+<meta name="description" content="描述你的情境或心情，AI 幫你找出貼切的成語、典故、唐詩宋詞元曲與新詩名句，附出處、白話與用法，寫卡片、致詞、文案都能直接引用。">
+<meta property="og:title" content="詩詞找句｜說個情境，找一句古人替你說">
+<meta property="og:description" content="輸入情境，找出貼切的成語典故、唐詩宋詞元曲與新詩，附出處與白話解釋。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5efe3;
+    --paper: #fbf7ef;
+    --ink: #2b2620;
+    --ink-soft: #6b6157;
+    --line: #e2d8c6;
+    --seal: #b0322a;
+    --seal-soft: #f3dcd6;
+    --chip: #efe6d5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1916;
+      --paper: #24211d;
+      --ink: #ece4d6;
+      --ink-soft: #a89e90;
+      --line: #3a352e;
+      --seal: #e0645a;
+      --seal-soft: #3d2622;
+      --chip: #2e2a25;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1916; --paper: #24211d; --ink: #ece4d6; --ink-soft: #a89e90;
+    --line: #3a352e; --seal: #e0645a; --seal-soft: #3d2622; --chip: #2e2a25;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Noto Serif TC", "Songti TC", serif;
+    line-height: 1.8;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 16px 64px; }
+  header { text-align: center; margin-bottom: 32px; }
+  .seal {
+    display: inline-block;
+    border: 2px solid var(--seal);
+    color: var(--seal);
+    padding: 2px 8px;
+    font-size: 13px;
+    letter-spacing: 4px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+  h1 { font-size: clamp(32px, 7vw, 48px); font-weight: 900; margin: 0; letter-spacing: 6px; }
+  .sub { color: var(--ink-soft); margin: 8px 0 0; }
+
+  form {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  textarea {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 17px;
+    outline: none;
+  }
+  textarea::placeholder { color: var(--ink-soft); opacity: .7; }
+  .row { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .count { font-size: 13px; color: var(--ink-soft); }
+  button.go {
+    background: var(--seal);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 24px;
+    font: inherit;
+    font-weight: 600;
+    letter-spacing: 2px;
+    cursor: pointer;
+  }
+  button.go:disabled { opacity: .5; cursor: wait; }
+
+  .examples { margin: 16px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .examples span { font-size: 13px; color: var(--ink-soft); align-self: center; }
+  .chip {
+    background: var(--chip);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  #status { text-align: center; color: var(--ink-soft); margin: 32px 0 0; min-height: 1em; }
+  #status.err { color: var(--seal); }
+  .loading::after { content: "…"; animation: dots 1.2s steps(3) infinite; display: inline-block; width: 1.2em; text-align: left; overflow: hidden; vertical-align: bottom; }
+  @keyframes dots { from { width: 0 } to { width: 1.2em } }
+
+  #results { display: grid; gap: 16px; margin-top: 24px; }
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--seal);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .tag { font-size: 12px; color: var(--seal); background: var(--seal-soft); border-radius: 4px; padding: 0 8px; letter-spacing: 1px; }
+  .copy {
+    background: none; border: 1px solid var(--line); color: var(--ink-soft);
+    border-radius: 6px; padding: 2px 10px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .acts { display: flex; gap: 8px; }
+  a.copy { text-decoration: none; }
+  .quote { font-size: clamp(19px, 4.5vw, 23px); font-weight: 600; margin: 12px 0 4px; letter-spacing: 1px; }
+  .by { color: var(--ink-soft); font-size: 14px; margin: 0 0 12px; }
+  .card dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 15px; }
+  .card dt { color: var(--ink-soft); }
+  .card dd { margin: 0; }
+
+  footer { margin-top: 48px; text-align: center; font-size: 13px; color: var(--ink-soft); }
+  footer a { color: inherit; }
+  @media (max-width: 480px) {
+    .card dl { grid-template-columns: 1fr; gap: 0; }
+    .card dd { margin-bottom: 8px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="seal">詩詞找句</div>
+    <h1>借古人一句話</h1>
+    <p class="sub">說說你的情境或心情，找一句成語、典故、詩詞來替你說</p>
+  </header>
+
+  <form id="f">
+    <label for="q" style="position:absolute;left:-9999px">描述你的情境</label>
+    <textarea id="q" maxlength="300" placeholder="例如：好朋友下個月要出國工作，想在送別卡片上寫一句話"></textarea>
+    <div class="row">
+      <span class="count"><span id="n">0</span> / 300</span>
+      <button class="go" id="go" type="submit">找詩句</button>
+    </div>
+  </form>
+
+  <div class="examples" id="ex">
+    <span>試試看：</span>
+  </div>
+
+  <p id="status" role="status" aria-live="polite"></p>
+  <section id="results"></section>
+
+  <footer>
+    內容由 AI 整理，原文與出處偶有出入，正式引用前請再查證一次。<br>
+    由 <a href="https://aiqkangber.com" target="_blank" rel="noopener">Q kangber</a> 用 n8n＋AI 打造
+  </footer>
+</main>
+
+<script>
+const API = 'https://123422222222.zeabur.app/webhook/poem-finder';
+const EXAMPLES = [
+  '好朋友要出國工作，想在送別卡片上寫一句話',
+  '加班到半夜終於做完，看著窗外有點空虛',
+  '爸媽結婚三十週年，想寫一句祝福',
+  '考試落榜，想鼓勵自己再拚一次',
+  '中秋節一個人在外地過'
+];
+
+const $ = id => document.getElementById(id);
+const q = $('q'), go = $('go'), status = $('status'), results = $('results');
+
+EXAMPLES.forEach(t => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'chip'; b.textContent = t;
+  b.onclick = () => { q.value = t; updateCount(); search(); };
+  $('ex').appendChild(b);
+});
+
+function updateCount() { $('n').textContent = q.value.length; }
+q.addEventListener('input', updateCount);
+q.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); search(); }
+});
+$('f').addEventListener('submit', e => { e.preventDefault(); search(); });
+
+function setStatus(text, cls) { status.textContent = text; status.className = cls || ''; }
+
+function citation(it) {
+  const by = [it.era, it.author].filter(Boolean).join('·');
+  const src = it.source ? `〈${it.source}〉` : '';
+  return `${it.text}${by || src ? ' ——' + by + src : ''}`;
+}
+
+function render(items) {
+  results.innerHTML = '';
+  items.forEach(it => {
+    const card = document.createElement('article');
+    card.className = 'card';
+    const by = [it.era, it.author].filter(Boolean).join('·') + (it.source ? `〈${it.source}〉` : '');
+    card.innerHTML = `
+      <div class="card-top"><span class="tag"></span><span class="acts"><a class="copy verify" target="_blank" rel="noopener">查證</a><button class="copy" type="button">複製引用</button></span></div>
+      <p class="quote"></p>
+      <p class="by"></p>
+      <dl><dt>白話</dt><dd class="m"></dd><dt>怎麼用</dt><dd class="u"></dd></dl>`;
+    card.querySelector('.tag').textContent = it.type || '詩詞';
+    card.querySelector('.quote').textContent = it.text;
+    card.querySelector('.by').textContent = by;
+    card.querySelector('.m').textContent = it.meaning;
+    card.querySelector('.u').textContent = it.fit;
+    card.querySelector('.verify').href = 'https://www.google.com/search?q=' + encodeURIComponent('"' + it.text.replace(/[，。？！；、：]/g, ' ').trim().split(/\s+/)[0] + '" ' + (it.author || ''));
+    const btn = card.querySelector('button.copy');
+    btn.onclick = async () => {
+      try { await navigator.clipboard.writeText(citation(it)); btn.textContent = '已複製'; }
+      catch { btn.textContent = '複製失敗'; }
+      setTimeout(() => btn.textContent = '複製引用', 1500);
+    };
+    results.appendChild(card);
+  });
+}
+
+async function search() {
+  const text = q.value.trim();
+  if (text.length < 2) { setStatus('請先描述一下情境', 'err'); q.focus(); return; }
+  go.disabled = true;
+  results.innerHTML = '';
+  setStatus('翻書中', 'loading');
+  status.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: text })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!data.ok) { setStatus(data.error || '出了點狀況，稍後再試', 'err'); return; }
+    setStatus('');
+    render(data.items);
+    results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch {
+    setStatus('連線失敗，稍後再試', 'err');
+  } finally {
+    go.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
