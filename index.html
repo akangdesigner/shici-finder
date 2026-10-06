@@ -142,6 +142,9 @@
   .ex-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--seal); letter-spacing: 1px; }
   .ex p { margin: 4px 0 0; font-size: 16px; }
   .acts { display: flex; gap: 8px; }
+  .hidden-box { color: var(--ink-soft); font-size: 14px; }
+  .hidden-box summary { cursor: pointer; text-align: center; padding: 8px; }
+  .hidden-box .card { margin-top: 16px; opacity: .75; }
   .tag-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .badge { font-size: 12px; border-radius: 4px; padding: 0 8px; border: 1px solid; }
   .badge.good { color: var(--good); border-color: var(--good); }
@@ -254,9 +257,23 @@ async function copy(btn, text, label) {
   setTimeout(() => btn.textContent = label, 1500);
 }
 
+// 「查無此句」的不跟正常結果混在一起，收進底部摺疊
 function render(items) {
   results.innerHTML = '';
-  items.forEach(it => {
+  const shown = items.filter(it => it.check !== CHECK.missing);
+  const hidden = items.filter(it => it.check === CHECK.missing);
+  shown.forEach(it => results.appendChild(makeCard(it)));
+  if (!shown.length) setStatus('這次 AI 給的句子都查不到原文，換個描述或多勾幾種類型再試一次', 'err');
+  if (hidden.length) {
+    const d = document.createElement('details');
+    d.className = 'hidden-box';
+    d.innerHTML = `<summary>另有 ${hidden.length} 則 AI 給的句子查無原文，已隱藏</summary>`;
+    hidden.forEach(it => d.appendChild(makeCard(it)));
+    results.appendChild(d);
+  }
+}
+
+function makeCard(it) {
     const card = document.createElement('article');
     card.className = 'card';
     const by = [it.era, it.author].filter(Boolean).join('·') + (it.source ? `〈${it.source}〉` : '');
@@ -285,8 +302,7 @@ function render(items) {
     card.querySelector('.verify').href = 'https://www.google.com/search?q=' + encodeURIComponent('"' + it.text.replace(/[，。？！；、：]/g, ' ').trim().split(/\s+/)[0] + '" ' + (it.author || ''));
     const btn = card.querySelector('.acts button.copy');
     btn.onclick = () => copy(btn, citation(it), '複製引用');
-    results.appendChild(card);
-  });
+  return card;
 }
 
 async function search() {
