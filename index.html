@@ -226,6 +226,18 @@ const TYPES = [
   ['新詩', '白話現代詩，例如徐志摩、余光中']
 ];
 
+// 站長通行證：用 ?owner=xxx 開一次就記在這台瀏覽器，之後查詢不吃每 IP 每小時限制
+let OWNER = '';
+try {
+  const u = new URL(location.href);
+  if (u.searchParams.has('owner')) {
+    localStorage.setItem('owner', u.searchParams.get('owner'));
+    u.searchParams.delete('owner');
+    history.replaceState(null, '', u);
+  }
+  OWNER = localStorage.getItem('owner') || '';
+} catch {}
+
 const $ = id => document.getElementById(id);
 const q = $('q'), go = $('go'), status = $('status'), results = $('results');
 
@@ -343,7 +355,7 @@ async function search() {
     const res = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: text, types: selectedTypes() })
+      body: JSON.stringify({ q: text, types: selectedTypes(), ...(OWNER ? { owner: OWNER } : {}) })
     });
     const data = await res.json().catch(() => ({}));
     if (!data.ok) { setStatus(data.error || '出了點狀況，稍後再試', 'err'); return; }
