@@ -142,6 +142,8 @@
   .ex-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--seal); letter-spacing: 1px; }
   .ex p { margin: 4px 0 0; font-size: 16px; }
   .acts { display: flex; gap: 8px; }
+  .more-tip { text-align: center; color: var(--ink-soft); font-size: 14px; }
+  .more-tip p { margin: 0 0 8px; }
   .hidden-box { color: var(--ink-soft); font-size: 14px; }
   .hidden-box summary { cursor: pointer; text-align: center; padding: 8px; }
   .hidden-box .card { margin-top: 16px; opacity: .75; }
@@ -264,6 +266,19 @@ function render(items) {
   const hidden = items.filter(it => it.check === CHECK.missing);
   shown.forEach(it => results.appendChild(makeCard(it)));
   if (!shown.length) setStatus('這次 AI 給的句子都查不到原文，換個描述或多勾幾種類型再試一次', 'err');
+  // 結果少又沒勾成語／古文：這類情境（罵人、勸學…）多半落在成語古文，詩詞裡真句本來就少
+  const sel = selectedTypes();
+  const extra = ['成語', '古文'].filter(t => !sel.includes(t));
+  if (shown.length < 4 && sel.length && extra.length) {
+    const tip = document.createElement('div');
+    tip.className = 'more-tip';
+    tip.innerHTML = `<p>勾選的類型裡能核對到的真句只有這些。這個情境用${extra.join('、')}通常能找到更多。</p>`;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.textContent = `加選${extra.join('、')}再找一次`;
+    b.onclick = () => { extra.forEach(t => document.querySelector(`.tchip[data-type="${t}"]`).setAttribute('aria-pressed', 'true')); syncClear(); search(); };
+    tip.appendChild(b);
+    results.appendChild(tip);
+  }
   if (hidden.length) {
     const d = document.createElement('details');
     d.className = 'hidden-box';
