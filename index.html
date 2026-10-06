@@ -131,6 +131,7 @@
     border-radius: 6px; padding: 2px 10px; font: inherit; font-size: 13px; cursor: pointer;
   }
   .types { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 0; border-top: 1px dashed var(--line); }
+  .types-hint { margin: -4px 0 8px; font-size: 12px; color: var(--ink-soft); }
   .types-label { font-size: 13px; color: var(--ink-soft); }
   .tchip {
     background: transparent; border: 1px solid var(--line); color: var(--ink-soft);
@@ -182,6 +183,7 @@
     <div class="types" id="types" role="group" aria-label="引用類型">
       <span class="types-label">類型（不選＝不限）</span>
     </div>
+    <p class="types-hint">古文名句＝論語、史記等散文；歷代詩詞＝唐宋元以外的詩詞，如宋詩、明清詩</p>
     <div class="row">
       <span class="count"><span id="n">0</span> / 300</span>
       <button class="go" id="go" type="submit">找詩句</button>
@@ -212,14 +214,24 @@ const EXAMPLES = [
   '中秋節一個人在外地過'
 ];
 
-const TYPES = ['成語', '典故', '詩經楚辭', '唐詩', '宋詞', '元曲', '古文', '其他古詩詞', '新詩'];
+// 名稱要跟 n8n「驗證與限流」的 ALLOWED、「組 AI 請求」的 type 清單一致
+const TYPES = [
+  ['成語典故', '成語，或有歷史故事的典故詞語，例如臥薪嘗膽、破釜沉舟'],
+  ['詩經楚辭', '先秦的詩經與屈原等人的楚辭'],
+  ['唐詩', '唐代的詩'],
+  ['宋詞', '宋代的詞'],
+  ['元曲', '元代的散曲與雜劇'],
+  ['古文名句', '散文裡的名句，例如論語、孟子、史記、古文觀止選文'],
+  ['歷代詩詞', '其他朝代的詩詞，例如漢魏六朝詩、宋詩、明清詩詞'],
+  ['新詩', '白話現代詩，例如徐志摩、余光中']
+];
 
 const $ = id => document.getElementById(id);
 const q = $('q'), go = $('go'), status = $('status'), results = $('results');
 
-TYPES.forEach(t => {
+TYPES.forEach(([t, desc]) => {
   const b = document.createElement('button');
-  b.type = 'button'; b.className = 'tchip'; b.textContent = t; b.dataset.type = t;
+  b.type = 'button'; b.className = 'tchip'; b.textContent = t; b.dataset.type = t; b.title = desc;
   b.setAttribute('aria-pressed', 'false');
   b.onclick = () => { b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); syncClear(); };
   $('types').appendChild(b);
@@ -268,7 +280,7 @@ function render(items) {
   if (!shown.length) setStatus('這次 AI 給的句子都查不到原文，換個描述或多勾幾種類型再試一次', 'err');
   // 結果少又沒勾成語／古文：這類情境（罵人、勸學…）多半落在成語古文，詩詞裡真句本來就少
   const sel = selectedTypes();
-  const extra = ['成語', '古文'].filter(t => !sel.includes(t));
+  const extra = ['成語典故', '古文名句'].filter(t => !sel.includes(t));
   if (shown.length < 4 && sel.length && extra.length) {
     const tip = document.createElement('div');
     tip.className = 'more-tip';
